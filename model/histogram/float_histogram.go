@@ -541,8 +541,8 @@ func (h *FloatHistogram) NegativeReverseBucketIterator() BucketIterator[float64]
 func (h *FloatHistogram) AllBucketIterator() BucketIterator[float64] {
 	return &allFloatBucketIterator{
 		h:         h,
-		leftIter:  h.NegativeReverseBucketIterator(),
-		rightIter: h.PositiveBucketIterator(),
+		leftIter:  newReverseFloatBucketIterator(h.NegativeSpans, h.NegativeBuckets, h.Schema, false),
+		rightIter: h.floatBucketIterator(true, 0, h.Schema),
 		state:     -1,
 	}
 }
@@ -555,8 +555,8 @@ func (h *FloatHistogram) AllBucketIterator() BucketIterator[float64] {
 func (h *FloatHistogram) AllReverseBucketIterator() BucketIterator[float64] {
 	return &allFloatBucketIterator{
 		h:         h,
-		leftIter:  h.PositiveReverseBucketIterator(),
-		rightIter: h.NegativeBucketIterator(),
+		leftIter:  newReverseFloatBucketIterator(h.PositiveSpans, h.PositiveBuckets, h.Schema, true),
+		rightIter: h.floatBucketIterator(false, 0, h.Schema),
 		state:     -1,
 	}
 }
@@ -709,7 +709,7 @@ func (h *FloatHistogram) floatBucketIterator(
 	return i
 }
 
-// reverseFloatbucketiterator is a low-level constructor for reverse bucket iterators.
+// reverseFloatBucketIterator is a low-level constructor for reverse bucket iterators.
 func newReverseFloatBucketIterator(
 	spans []Span, buckets []float64, schema int32, positive bool,
 ) reverseFloatBucketIterator {
@@ -741,6 +741,8 @@ type floatBucketIterator struct {
 	targetSchema       int32   // targetSchema is the schema to merge to and must be ≤ schema.
 	origIdx            int32   // The bucket index within the original schema.
 	absoluteStartValue float64 // Never return buckets with an upper bound ≤ this value.
+
+	boundReachedStartValue bool // Has getBound reached absoluteStartValue already?
 }
 
 func (i *floatBucketIterator) At() Bucket[float64] {
@@ -804,9 +806,10 @@ mergeLoop: // Merge together all buckets from the original schema that fall into
 	}
 	// Skip buckets before absoluteStartValue.
 	// TODO(beorn7): Maybe do something more efficient than this recursive call.
-	if getBound(i.currIdx, i.targetSchema) <= i.absoluteStartValue {
+	if !i.boundReachedStartValue && getBound(i.currIdx, i.targetSchema) <= i.absoluteStartValue {
 		return i.Next()
 	}
+	i.boundReachedStartValue = true
 	return true
 }
 
@@ -847,8 +850,9 @@ func (i *reverseFloatBucketIterator) Next() bool {
 }
 
 type allFloatBucketIterator struct {
-	h                   *FloatHistogram
-	leftIter, rightIter BucketIterator[float64]
+	h         *FloatHistogram
+	leftIter  reverseFloatBucketIterator
+	rightIter floatBucketIterator
 	// -1 means we are iterating negative buckets.
 	// 0 means it is time for the zero bucket.
 	// 1 means we are iterating positive buckets.

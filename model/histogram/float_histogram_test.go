@@ -2293,6 +2293,20 @@ func TestFloatBucketIteratorTargetSchema(t *testing.T) {
 	require.False(t, it.Next(), "negative iterator not exhausted")
 }
 
+func BenchmarkFloatHistogramAllBucketIterator(b *testing.B) {
+	rng := rand.New(rand.NewSource(0))
+
+	fh := createRandomFloatHistogram(rng, 50)
+
+	b.ReportAllocs() // the current implementation reports 1 alloc
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		for it := fh.AllReverseBucketIterator(); it.Next(); {
+		}
+	}
+}
+
 func BenchmarkFloatHistogramDetectReset(b *testing.B) {
 	rng := rand.New(rand.NewSource(0))
 
