@@ -269,7 +269,7 @@ func (h *FloatHistogram) Add(other *FloatHistogram) *FloatHistogram {
 	h.Sum += other.Sum
 
 	if other.Schema != h.Schema {
-		other = other.ReduceResolution(h.Schema)
+		other = other.CopyToSchema(h.Schema)
 	}
 
 	h.PositiveSpans, h.PositiveBuckets = addBuckets(h.Schema, h.ZeroThreshold, false, h.PositiveSpans, h.PositiveBuckets, other.PositiveSpans, other.PositiveBuckets)
@@ -285,7 +285,7 @@ func (h *FloatHistogram) Sub(other *FloatHistogram) *FloatHistogram {
 	h.Sum -= other.Sum
 
 	if other.Schema != h.Schema {
-		other = other.ReduceResolution(h.Schema)
+		other = other.CopyToSchema(h.Schema)
 	}
 
 	h.PositiveSpans, h.PositiveBuckets = addBuckets(h.Schema, h.ZeroThreshold, true, h.PositiveSpans, h.PositiveBuckets, other.PositiveSpans, other.PositiveBuckets)
